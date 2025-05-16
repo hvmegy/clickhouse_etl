@@ -1,4 +1,6 @@
-CREATE TABLE vgsales_raw
+CREATE DATABASE IF NOT EXISTS vgsales_stage;
+USE vgsales_stage;
+CREATE TABLE vgsales_stage.vgsales_raw
 (
     Rank Int32 NOT NULL,
     Name String,

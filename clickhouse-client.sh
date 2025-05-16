@@ -1,0 +1,1 @@
+docker exec -it clickhouse-server clickhouse-client
