@@ -26,18 +26,18 @@ FROM vgsales_raw.vgsales_raw;
 CREATE TABLE dim_country
 (
     country_id Int32 NOT NULL,
-    country_name String
+    country String
 )
 ENGINE = MergeTree()
 ORDER BY (country_id);
 
-INSERT INTO dim_country (country_id, country_name)
+INSERT INTO dim_country (country_id, country)
 SELECT
     rowNumberInAllBlocks() AS country_id,
-    country_name
+    country
 FROM
 (
-    SELECT arrayJoin(['NA', 'EU', 'JP', 'Other']) AS country_name
+    SELECT arrayJoin(['NA', 'EU', 'JP', 'Other']) AS country
 );
 
 --- end dim_country ---
@@ -143,4 +143,121 @@ FROM (
 );
 --- end dim_genre ---
 
+--- fact_sales ---
+CREATE TABLE fact_sales
+(
+    sales_id Int32 NOT NULL, 
+    game_id Int32,
+    platform_id Int32,
+    year_id Int32,
+    genre_id Int32,
+    publisher_id Int32,
+    country_id Int32,
+    sales Float64
+)
+ENGINE = MergeTree()
+ORDER BY (sales_id);
 
+with res as 
+(
+    with na_sales as 
+    ( 
+        SELECT
+            game_id, 
+            platform_id,
+            year_id,
+            genre_id,
+            publisher_id,
+            country_id,
+            NA_Sales AS sales
+        FROM vgsales_stage.vgsales_raw
+        JOIN dim_game ON vgsales_stage.vgsales_raw.Name = dim_game.name
+        JOIN dim_platform ON vgsales_stage.vgsales_raw.Platform = dim_platform.platform
+        JOIN dim_year ON vgsales_stage.vgsales_raw.Year = dim_year.year
+        JOIN dim_genre ON vgsales_stage.vgsales_raw.Genre = dim_genre.genre
+        JOIN dim_publisher ON vgsales_stage.vgsales_raw.Publisher = dim_publisher.publisher
+        JOIN dim_country ON 'NA' = dim_country.country
+        WHERE NA_Sales > 0
+    ),
+    eu_sales as ( 
+        SELECT
+            game_id, 
+            platform_id,
+            year_id,
+            genre_id,
+            publisher_id,
+            country_id,
+            EU_Sales AS sales
+        FROM vgsales_stage.vgsales_raw
+        JOIN dim_game ON vgsales_stage.vgsales_raw.Name = dim_game.name
+        JOIN dim_platform ON vgsales_stage.vgsales_raw.Platform = dim_platform.platform
+        JOIN dim_year ON vgsales_stage.vgsales_raw.Year = dim_year.year
+        JOIN dim_genre ON vgsales_stage.vgsales_raw.Genre = dim_genre.genre
+        JOIN dim_publisher ON vgsales_stage.vgsales_raw.Publisher = dim_publisher.publisher
+        JOIN dim_country ON 'EU' = dim_country.country
+        WHERE EU_Sales > 0
+    ),
+    jp_sales as ( 
+        SELECT
+            game_id, 
+            platform_id,
+            year_id,
+            genre_id,
+            publisher_id,
+            country_id,
+            JP_Sales AS sales
+        FROM vgsales_stage.vgsales_raw
+        JOIN dim_game ON vgsales_stage.vgsales_raw.Name = dim_game.name
+        JOIN dim_platform ON vgsales_stage.vgsales_raw.Platform = dim_platform.platform
+        JOIN dim_year ON vgsales_stage.vgsales_raw.Year = dim_year.year
+        JOIN dim_genre ON vgsales_stage.vgsales_raw.Genre = dim_genre.genre
+        JOIN dim_publisher ON vgsales_stage.vgsales_raw.Publisher = dim_publisher.publisher
+        JOIN dim_country ON 'JP' = dim_country.country
+        WHERE JP_Sales > 0
+    ),
+    other_sales as ( 
+        SELECT
+            game_id, 
+            platform_id,
+            year_id,
+            genre_id,
+            publisher_id,
+            country_id,
+            Other_Sales AS sales
+        FROM vgsales_stage.vgsales_raw
+        JOIN dim_game ON vgsales_stage.vgsales_raw.Name = dim_game.name
+        JOIN dim_platform ON vgsales_stage.vgsales_raw.Platform = dim_platform.platform
+        JOIN dim_year ON vgsales_stage.vgsales_raw.Year = dim_year.year
+        JOIN dim_genre ON vgsales_stage.vgsales_raw.Genre = dim_genre.genre
+        JOIN dim_publisher ON vgsales_stage.vgsales_raw.Publisher = dim_publisher.publisher
+        JOIN dim_country ON 'Other' = dim_country.country
+        WHERE Other_Sales > 0
+    )
+    SELECT * FROM na_sales 
+    union all 
+    SELECT * FROM eu_sales 
+    union all 
+    select * from jp_sales 
+    union all 
+    select * from other_sales
+)
+insert into fact_sales (
+    sales_id, 
+    game_id,
+    platform_id,
+    year_id,
+    genre_id,
+    publisher_id,
+    country_id,
+    sales
+)
+select 
+    rowNumberInAllBlocks() as sales_id,
+    game_id,
+    platform_id,
+    year_id,
+    genre_id,
+    publisher_id,
+    country_id,
+    sales
+from res;
