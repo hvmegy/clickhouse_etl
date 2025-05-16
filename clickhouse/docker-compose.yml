@@ -9,8 +9,8 @@ services:
       - "9000:9000"
     environment:
       - CLICKHOUSE_DB=default
-      - CLICKHOUSE_USER=default
-      - CLICKHOUSE_PASSWORD=secret
+      - CLICKHOUSE_USER=${DB_USER}
+      - CLICKHOUSE_PASSWORD=${DB_PASSWORD}
     volumes:
       - clickhouse_data:/var/lib/clickhouse
     ulimits:
